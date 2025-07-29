@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lembretes - Sistema de Lembretes</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="/reminders">Sistema de Lembretes</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link <%= activeTab === 'all' ? 'active' : '' %>" href="/reminders">Todos</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link <%= activeTab === 'active' ? 'active' : '' %>" href="/reminders/active">Ativos</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link <%= activeTab === 'completed' ? 'active' : '' %>" href="/reminders/completed">Concluídos</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link <%= activeTab === 'cancelled' ? 'active' : '' %>" href="/reminders/cancelled">Cancelados</a>
+          </li>
+        </ul>
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <span class="nav-link">Olá, <%= user.name %></span>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/logout">Sair</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1>Meus Lembretes</h1>
+      <a href="/reminders/new" class="btn btn-primary">Novo Lembrete</a>
+    </div>
+    
+    <% if (reminders.length === 0) { %>
+      <div class="alert alert-info">Nenhum lembrete encontrado.</div>
+    <% } else { %>
+      <div class="row">
+        <% reminders.forEach(reminder => { %>
+          <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 <%= reminder.is_completed ? 'border-success' : '' %> <%= reminder.is_cancelled ? 'border-danger' : '' %>">
+              <div class="card-body">
+                <h5 class="card-title"><%= reminder.title %></h5>
+                <% if (reminder.description) { %>
+                  <p class="card-text"><%= reminder.description %></p>
+                <% } %>
+                <ul class="list-group list-group-flush mb-3">
+                  <li class="list-group-item">
+                    <strong>Data do Evento:</strong> 
+                    <%= new Date(reminder.event_date).toLocaleString() %>
+                  </li>
+                  <li class="list-group-item">
+                    <strong>Lembrete em:</strong> 
+                    <%= new Date(reminder.reminder_date).toLocaleString() %>
+                  </li>
+                </ul>
+              </div>
+              <div class="card-footer bg-transparent">
+                <div class="d-flex justify-content-between">
+                  <% if (!reminder.is_completed && !reminder.is_cancelled) { %>
+                    <form action="/reminders/<%= reminder.id %>/complete" method="POST" class="me-2">
+                      <button type="submit" class="btn btn-sm btn-success">Concluir</button>
+                    </form>
+                    <form action="/reminders/<%= reminder.id %>/cancel" method="POST" class="me-2">
+                      <button type="submit" class="btn btn-sm btn-warning">Cancelar</button>
+                    </form>
+                  <% } %>
+                  <a href="/reminders/<%= reminder.id %>/edit" class="btn btn-sm btn-primary me-2">Editar</a>
+                  <form action="/reminders/<%= reminder.id %>/delete" method="POST">
+                    <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

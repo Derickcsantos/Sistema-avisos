@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= reminder ? 'Editar' : 'Novo' %> Lembrete - Sistema de Lembretes</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="/reminders">Sistema de Lembretes</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/reminders">Lembretes</a>
+          </li>
+        </ul>
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <span class="nav-link">Olá, <%= user.name %></span>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/logout">Sair</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container mt-4">
+    <h1><%= reminder ? 'Editar Lembrete' : 'Novo Lembrete' %></h1>
+    
+    <form action="<%= reminder ? `/reminders/${reminder.id}` : '/reminders' %>" method="POST">
+      <div class="mb-3">
+        <label for="title" class="form-label">Título</label>
+        <input type="text" class="form-control" id="title" name="title" 
+               value="<%= reminder ? reminder.title : '' %>" required>
+      </div>
+      <div class="mb-3">
+        <label for="description" class="form-label">Descrição (opcional)</label>
+        <textarea class="form-control" id="description" name="description" rows="3"><%= reminder ? reminder.description : '' %></textarea>
+      </div>
+      <div class="mb-3">
+        <label for="event_date" class="form-label">Data do Evento</label>
+        <input type="datetime-local" class="form-control" id="event_date" name="event_date" 
+               value="<%= reminder ? new Date(reminder.event_date).toISOString().slice(0, 16) : '' %>" required>
+      </div>
+      <div class="mb-3">
+        <label for="reminder_date" class="form-label">Data do Lembrete</label>
+        <input type="datetime-local" class="form-control" id="reminder_date" name="reminder_date" 
+               value="<%= reminder ? new Date(reminder.reminder_date).toISOString().slice(0, 16) : '' %>" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Salvar</button>
+      <a href="/reminders" class="btn btn-secondary">Cancelar</a>
+    </form>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
