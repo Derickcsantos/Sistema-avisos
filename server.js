@@ -5,6 +5,8 @@ const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const nodemailer = require('nodemailer');
+const passport = require("passport");
+require("./auth");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -34,6 +36,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Middleware para verificar autenticação
 const checkAuth = (req, res, next) => {
@@ -101,6 +105,8 @@ app.get('/register', (req, res) => {
   res.render('register', { error: null });
 });
 
+app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
 app.post('/register', async (req, res) => {
   const { name, email, password } = req.body;
   
@@ -128,6 +134,14 @@ app.post('/register', async (req, res) => {
   res.redirect('/reminders');
 });
 
+app.get(
+  "/api/auth/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: "/login",
+    successRedirect: "/reminders",
+  })
+);
+
 app.get('/logout', (req, res) => {
   req.session.destroy();
   res.redirect('/login');
@@ -151,6 +165,15 @@ app.get('/reminders', checkAuth, async (req, res) => {
     activeTab: 'all'
   });
 });
+
+app.get("/api/me", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.json(req.user);
+  } else {
+    res.status(401).json({ message: "Not authenticated" });
+  }
+});
+
 
 app.get('/reminders/active', checkAuth, async (req, res) => {
   const { data: reminders, error } = await supabase
