@@ -135,11 +135,11 @@ app.post('/register', async (req, res) => {
 });
 
 app.get(
-  "/api/auth/google/callback",
-  passport.authenticate("google", {
-    failureRedirect: "/login",
-    successRedirect: "/reminders",
-  })
+  "/api/auth/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: "/login",
+    successRedirect: "/reminders",
+  })
 );
 
 app.get('/logout', (req, res) => {
