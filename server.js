@@ -6,7 +6,7 @@ const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const passport = require("passport");
-require("./auth");
+const auth = require('./auth');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -29,7 +29,7 @@ const transporter = nodemailer.createTransport({
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secret-key',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   cookie: { secure: false }
 }));
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -41,36 +41,61 @@ app.use(passport.session());
 
 // Middleware para verificar autenticação
 const checkAuth = (req, res, next) => {
-  if (!req.session.user) {
+  if (!req.isAuthenticated()) {
     return res.redirect('/login');
   }
   next();
 };
 
+// Middleware para buscar o id do usuário autenticado
+const fetchUserId = async (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).send('Usuário não autenticado');
+  }
+  // Se já tiver userDbId na sessão, usa ele
+  if (req.session && req.session.userDbId) {
+    req.userDbId = req.session.userDbId;
+    return next();
+  }
+  // Busca o id do usuário pelo email
+  const { data: userDb, error: userError } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', req.user.email)
+    .single();
+  if (userError || !userDb) {
+    console.error(userError);
+    return res.status(500).send('Usuário não encontrado');
+  }
+  req.userDbId = userDb.id;
+  if (req.session) req.session.userDbId = userDb.id;
+  next();
+};
+
 // Rotas
 // Rota principal
-app.get('/', checkAuth, async (req, res) => {
+app.get('/', checkAuth, fetchUserId, async (req, res) => {
   // Contar lembretes por status
   const { count: allCount } = await supabase
     .from('reminders')
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', req.session.user.id);
+    .eq('user_id', req.userDbId);
 
   const { count: activeCount } = await supabase
     .from('reminders')
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', req.session.user.id)
+    .eq('user_id', req.userDbId)
     .eq('is_completed', false)
     .eq('is_cancelled', false);
 
   const { count: completedCount } = await supabase
     .from('reminders')
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', req.session.user.id)
+    .eq('user_id', req.userDbId)
     .eq('is_completed', true);
 
   res.render('index', {
-    user: req.session.user,
+    user: req.user,
     remindersCount: {
       all: allCount || 0,
       active: activeCount || 0,
@@ -97,7 +122,8 @@ app.post('/login', async (req, res) => {
     return res.render('login', { error: 'Credenciais inválidas' });
   }
   
-  req.session.user = data;
+  req.user = data;
+  req.session.userDbId = data.id;
   res.redirect('/reminders');
 });
 
@@ -130,16 +156,17 @@ app.post('/register', async (req, res) => {
     return res.render('register', { error: 'Erro ao cadastrar usuário' });
   }
   
-  req.session.user = data;
+  req.user = data;
+  req.session.userDbId = data.id;
   res.redirect('/reminders');
 });
 
 app.get(
-  "/api/auth/google/callback",
-  passport.authenticate("google", {
-    failureRedirect: "/login",
-    successRedirect: "/reminders",
-  })
+  "/api/auth/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: "/login",
+    successRedirect: "/reminders",
+  })
 );
 
 app.get('/logout', (req, res) => {
@@ -147,11 +174,13 @@ app.get('/logout', (req, res) => {
   res.redirect('/login');
 });
 
-app.get('/reminders', checkAuth, async (req, res) => {
+app.get('/reminders', checkAuth, fetchUserId, async (req, res) => {
+  console.log("Usuário logado:", req.user);
+
   const { data: reminders, error } = await supabase
     .from('reminders')
     .select('*')
-    .eq('user_id', req.session.user.id)
+    .eq('user_id', req.userDbId)
     .order('event_date', { ascending: true });
   
   if (error) {
@@ -160,7 +189,7 @@ app.get('/reminders', checkAuth, async (req, res) => {
   }
   
   res.render('reminders', { 
-    user: req.session.user, 
+    user: req.user, 
     reminders,
     activeTab: 'all'
   });
@@ -174,12 +203,11 @@ app.get("/api/me", (req, res) => {
   }
 });
 
-
-app.get('/reminders/active', checkAuth, async (req, res) => {
+app.get('/reminders/active', checkAuth, fetchUserId, async (req, res) => {
   const { data: reminders, error } = await supabase
     .from('reminders')
     .select('*')
-    .eq('user_id', req.session.user.id)
+    .eq('user_id', req.userDbId)
     .eq('is_completed', false)
     .eq('is_cancelled', false)
     .order('event_date', { ascending: true });
@@ -190,17 +218,17 @@ app.get('/reminders/active', checkAuth, async (req, res) => {
   }
   
   res.render('reminders', { 
-    user: req.session.user, 
+    user: req.user, 
     reminders,
     activeTab: 'active'
   });
 });
 
-app.get('/reminders/completed', checkAuth, async (req, res) => {
+app.get('/reminders/completed', checkAuth, fetchUserId, async (req, res) => {
   const { data: reminders, error } = await supabase
     .from('reminders')
     .select('*')
-    .eq('user_id', req.session.user.id)
+    .eq('user_id', req.userDbId)
     .eq('is_completed', true)
     .order('event_date', { ascending: true });
   
@@ -210,17 +238,17 @@ app.get('/reminders/completed', checkAuth, async (req, res) => {
   }
   
   res.render('reminders', { 
-    user: req.session.user, 
+    user: req.user, 
     reminders,
     activeTab: 'completed'
   });
 });
 
-app.get('/reminders/cancelled', checkAuth, async (req, res) => {
+app.get('/reminders/cancelled', checkAuth, fetchUserId, async (req, res) => {
   const { data: reminders, error } = await supabase
     .from('reminders')
     .select('*')
-    .eq('user_id', req.session.user.id)
+    .eq('user_id', req.userDbId)
     .eq('is_cancelled', true)
     .order('event_date', { ascending: true });
   
@@ -230,26 +258,26 @@ app.get('/reminders/cancelled', checkAuth, async (req, res) => {
   }
   
   res.render('reminders', { 
-    user: req.session.user, 
+    user: req.user, 
     reminders,
     activeTab: 'cancelled'
   });
 });
 
-app.get('/reminders/new', checkAuth, (req, res) => {
+app.get('/reminders/new', checkAuth, fetchUserId, (req, res) => {
   res.render('edit-reminder', { 
-    user: req.session.user, 
+    user: req.user, 
     reminder: null 
   });
 });
 
-app.post('/reminders', checkAuth, async (req, res) => {
+app.post('/reminders', checkAuth, fetchUserId, async (req, res) => {
   const { title, description, event_date, reminder_date } = req.body;
   
   const { error } = await supabase
     .from('reminders')
     .insert([{
-      user_id: req.session.user.id,
+      user_id: req.userDbId,
       title,
       description,
       event_date: new Date(event_date).toISOString(),
@@ -264,14 +292,14 @@ app.post('/reminders', checkAuth, async (req, res) => {
   res.redirect('/reminders');
 });
 
-app.get('/reminders/:id/edit', checkAuth, async (req, res) => {
+app.get('/reminders/:id/edit', checkAuth, fetchUserId, async (req, res) => {
   const { id } = req.params;
   
   const { data: reminder, error } = await supabase
     .from('reminders')
     .select('*')
     .eq('id', id)
-    .eq('user_id', req.session.user.id)
+    .eq('user_id', req.userDbId)
     .single();
   
   if (error || !reminder) {
@@ -279,12 +307,12 @@ app.get('/reminders/:id/edit', checkAuth, async (req, res) => {
   }
   
   res.render('edit-reminder', { 
-    user: req.session.user, 
+    user: req.user, 
     reminder 
   });
 });
 
-app.post('/reminders/:id', checkAuth, async (req, res) => {
+app.post('/reminders/:id', checkAuth, fetchUserId, async (req, res) => {
   const { id } = req.params;
   const { title, description, event_date, reminder_date } = req.body;
   
@@ -298,7 +326,7 @@ app.post('/reminders/:id', checkAuth, async (req, res) => {
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
-    .eq('user_id', req.session.user.id);
+    .eq('user_id', req.userDbId);
   
   if (error) {
     console.error(error);
@@ -308,7 +336,7 @@ app.post('/reminders/:id', checkAuth, async (req, res) => {
   res.redirect('/reminders');
 });
 
-app.post('/reminders/:id/complete', checkAuth, async (req, res) => {
+app.post('/reminders/:id/complete', checkAuth, fetchUserId, async (req, res) => {
   const { id } = req.params;
   
   const { error } = await supabase
@@ -318,7 +346,7 @@ app.post('/reminders/:id/complete', checkAuth, async (req, res) => {
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
-    .eq('user_id', req.session.user.id);
+    .eq('user_id', req.userDbId);
   
   if (error) {
     console.error(error);
@@ -328,7 +356,7 @@ app.post('/reminders/:id/complete', checkAuth, async (req, res) => {
   res.redirect('/reminders');
 });
 
-app.post('/reminders/:id/cancel', checkAuth, async (req, res) => {
+app.post('/reminders/:id/cancel', checkAuth, fetchUserId, async (req, res) => {
   const { id } = req.params;
   
   const { error } = await supabase
@@ -338,7 +366,7 @@ app.post('/reminders/:id/cancel', checkAuth, async (req, res) => {
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
-    .eq('user_id', req.session.user.id);
+    .eq('user_id', req.userDbId);
   
   if (error) {
     console.error(error);
@@ -348,14 +376,14 @@ app.post('/reminders/:id/cancel', checkAuth, async (req, res) => {
   res.redirect('/reminders');
 });
 
-app.post('/reminders/:id/delete', checkAuth, async (req, res) => {
+app.post('/reminders/:id/delete', checkAuth, fetchUserId, async (req, res) => {
   const { id } = req.params;
   
   const { error } = await supabase
     .from('reminders')
     .delete()
     .eq('id', id)
-    .eq('user_id', req.session.user.id);
+    .eq('user_id', req.userDbId);
   
   if (error) {
     console.error(error);

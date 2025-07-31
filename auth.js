@@ -1,6 +1,9 @@
 require('dotenv').config();
-const passport = require("passport");
-const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 passport.use(
   new GoogleStrategy(
@@ -10,16 +13,50 @@ passport.use(
       callbackURL: process.env.GOOGLE_CALLBACK_URL,
     },
     async (accessToken, refreshToken, profile, done) => {
-      const user = {
-        googleId: profile.id,
-        name: profile.displayName,
-        email: profile.emails[0].value,
-      };
+      try {
+        const googleId = profile.id;
+        const name = profile.displayName;
+        const email = profile.emails[0].value;
 
-      // Aqui você salva no seu banco de dados, se necessário
-      // ex: await db.saveOrUpdateUser(user)
+        // Verificar se usuário já existe
+        const { data: existingUser, error: selectError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single();
 
-      return done(null, user);
+        if (selectError && selectError.code !== 'PGRST116') {
+          return done(selectError, null);
+        }
+
+        if (existingUser) {
+          return done(null, existingUser); // já tem ID
+        }
+
+        // Criar novo usuário
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            name,
+            email,
+            google_id: googleId,
+            password: null,      // Usuário Google não tem senha
+            plano: 'Free',       // Valor padrão
+            tipo: 'Comum',       // Valor padrão
+            phone: null          // Opcional
+          }])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Erro ao inserir usuário:', JSON.stringify(insertError, null, 2));
+          return done(insertError, null);
+        }
+
+        return done(null, newUser);
+      } catch (err) {
+        return done(err, null);
+      }
     }
   )
 );
