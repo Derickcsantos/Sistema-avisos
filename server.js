@@ -7,6 +7,7 @@ const path = require('path');
 const nodemailer = require('nodemailer');
 const passport = require("passport");
 const auth = require('./auth');
+const { google } = require('googleapis');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -122,9 +123,11 @@ app.post('/login', async (req, res) => {
     return res.render('login', { error: 'Credenciais inválidas' });
   }
   
-  req.user = data;
   req.session.userDbId = data.id;
-  res.redirect('/reminders');
+    req.login(data, function(err) {
+    if (err) { return next(err); }
+    return res.redirect('/reminders');
+  });
 });
 
 app.get('/register', (req, res) => {
@@ -392,6 +395,46 @@ app.post('/reminders/:id/delete', checkAuth, fetchUserId, async (req, res) => {
   
   res.redirect('/reminders');
 });
+
+app.post('/calendar', checkAuth, async (req, res) => {
+  if (!req.isAuthenticated()) return res.redirect('/auth/google');
+
+  const { accessToken } = req.user;
+  if (!accessToken) return res.status(401).send('Usuário não autenticado com Google');
+
+  // Receba os dados do evento do frontend
+  const { summary, description, startDateTime, endDateTime, timeZone } = req.body;
+
+  const oauth2Client = new google.auth.OAuth2();
+  oauth2Client.setCredentials({ access_token: accessToken });
+
+  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+  const event = {
+    summary,
+    description,
+    start: {
+      dateTime: startDateTime,
+      timeZone: timeZone || 'America/Sao_Paulo',
+    },
+    end: {
+      dateTime: endDateTime,
+      timeZone: timeZone || 'America/Sao_Paulo',
+    },
+  };
+
+  try {
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      resource: event,
+    });
+    res.send(`✅ Evento criado com sucesso! <a href="${response.data.htmlLink}" target="_blank">Ver no Google Calendar</a>`);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Erro ao criar evento');
+  }
+});
+
 
 // Iniciar servidor
 app.listen(port, () => {

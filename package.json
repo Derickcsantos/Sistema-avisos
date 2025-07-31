@@ -8,14 +8,15 @@
     "cron": "node cron.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.21.0",
+    "body-parser": "^1.20.2",
+    "cron": "^3.1.3",
     "dotenv": "^16.0.3",
     "ejs": "^3.1.8",
     "express": "^4.18.2",
-    "nodemailer": "^6.9.1",
-    "@supabase/supabase-js": "^2.21.0",
-    "cron": "^3.1.3",
-    "body-parser": "^1.20.2",
     "express-session": "^1.17.3",
+    "googleapis": "^154.1.0",
+    "nodemailer": "^6.9.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0"
   }

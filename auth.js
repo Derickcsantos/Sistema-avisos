@@ -11,6 +11,16 @@ passport.use(
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: process.env.GOOGLE_CALLBACK_URL,
+      scope: [
+        'profile',
+        'email',
+        'https://www.googleapis.com/auth/calendar', // escopo de escrita/leitura
+        // outros escopos possíveis:
+        // 'https://www.googleapis.com/auth/calendar.events',
+        // 'https://www.googleapis.com/auth/calendar.readonly'
+      ],
+      accessType: 'offline',
+      prompt: 'consent',
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -24,6 +34,12 @@ passport.use(
           .select('*')
           .eq('email', email)
           .single();
+
+        let userObj;
+        if (existingUser) {
+          userObj = { ...existingUser, accessToken };
+          return done(null, userObj);
+        }
 
         if (selectError && selectError.code !== 'PGRST116') {
           return done(selectError, null);
@@ -53,6 +69,7 @@ passport.use(
           return done(insertError, null);
         }
 
+        userObj = { ...newUser, accessToken };
         return done(null, newUser);
       } catch (err) {
         return done(err, null);

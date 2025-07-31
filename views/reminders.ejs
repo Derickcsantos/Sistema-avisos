@@ -10,7 +10,7 @@
 <body>
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container">
-      <a class="navbar-brand" href="/reminders">Sistema de Lembretes</a>
+      <a class="navbar-brand" href="/">Sistema de Lembretes</a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -81,9 +81,21 @@
                     </form>
                   <% } %>
                   <a href="/reminders/<%= reminder.id %>/edit" class="btn btn-sm btn-primary me-2">Editar</a>
-                  <form action="/reminders/<%= reminder.id %>/delete" method="POST">
-                    <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
-                  </form>
+                  
+                  <% if (user.accessToken) { %>
+                  <!-- Exemplo de formulário para criar evento -->
+                    <form action="/calendar" method="POST">
+                      <input type="hidden" name="summary" value="<%= reminder.title %>">
+                      <input type="hidden" name="description" value="<%= reminder.description %>">
+                      <input type="hidden" name="startDateTime" value="<%= new Date(reminder.event_date).toISOString() %>">
+                      <input type="hidden" name="endDateTime" value="<%= new Date(reminder.event_date).toISOString() %>">
+                      <input type="hidden" name="timeZone" value="America/Sao_Paulo">
+                      <button type="submit" class="btn btn-sm btn-primary">Calendário</button>
+                    </form>
+                  <% } %>
+                    <form action="/reminders/<%= reminder.id %>/delete" method="POST">
+                      <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
+                    </form>
                 </div>
               </div>
             </div>
@@ -94,5 +106,8 @@
   </div>
   
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    console.log('Usuário logado:', req.user);
+  </script>
 </body>
 </html>
